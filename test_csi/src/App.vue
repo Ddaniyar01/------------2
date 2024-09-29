@@ -21,24 +21,18 @@
 
     <section id="products" class="products">
       <h2>Наши товары</h2>
-      <div class="product-list">
-        <div class="product-item">
-          <h3>Кузов</h3>
 
-        </div>
-        <div class="product-item">
-          <h3>Двигатель</h3>
-
-        </div>
-        <div class="product-item">
-          <h3>Салон</h3>
-
-        </div>
-
+      <div class="add-product-form">
+        <input v-model="newItemName" placeholder="Название товара" />
+        <input type="number" v-model="newItemPrice" placeholder="Цена" />
+        <input type="number" v-model="newItemQuantity" placeholder="Количество" />
+        <select v-model="parentItem" @change="updateParentItem">
+          <option value="">Выберите родительский товар</option>
+          <option v-for="item in itemes" :key="item.name" :value="item">{{ item.name }}</option>
+        </select>
+        <button @click="addItem" class="add-btn">Добавить товар</button>
       </div>
-      <div>
-    <button @click="exportToExcel">Экспортировать в Excel</button>
-  </div>
+
       <table>
         <thead>
           <tr>
@@ -72,20 +66,26 @@
                   <button @click="addQuantity(child)">Добавить</button>
                 </td>
               </tr>
-              <tr v-for="childer in child.children" :key="childer.name">
-                <td>{{ childer.name }}</td>
-                <td>{{ childer.price }}</td>
-                <td>{{ childer.quantity }}</td>
-                <td>{{ childer.price * childer.quantity }}</td>
-                <td>
-                  <button @click="removeItem(childer)">Удалить</button>
-                  <button @click="addQuantity(childer)">Добавить</button>
-                </td>
-              </tr>
+              <template v-for="childer in child.children" :key="childer.name">
+                <tr>
+                  <td>{{ childer.name }}</td>
+                  <td>{{ childer.price }}</td>
+                  <td>{{ childer.quantity }}</td>
+                  <td>{{ childer.price * childer.quantity }}</td>
+                  <td>
+                    <button @click="removeItem(childer)">Удалить</button>
+                    <button @click="addQuantity(childer)">Добавить</button>
+                  </td>
+                </tr>
+              </template>
             </template>
           </template>
         </tbody>
       </table>
+
+      <div>
+        <button @click="exportToExcel" class="export-btn">Экспортировать в Excel</button>
+      </div>
     </section>
 
     <section id="contact" class="contact">
@@ -103,18 +103,30 @@
 
 <script>
 import * as XLSX from 'xlsx';
+
 export default {
   data() {
     return {
-      itemes: [
+      itemes: this.loadItems(),
+      newItemName: '',
+      newItemPrice: null,
+      newItemQuantity: null,
+      parentItem: null
+    };
+  },
+  methods: {
+    // Загрузка данных из localStorage
+    loadItems() {
+      const savedItems = localStorage.getItem('itemes');
+      return savedItems ? JSON.parse(savedItems) : [
         {
           name: "Кузов",
-          price: null,
+          price: 0,
           quantity: 2,
           children: [
             {
               name: "Двери",
-              price: null,
+              price: 10000,
               quantity: 3,
               children: [
                 {
@@ -132,67 +144,60 @@ export default {
           ]
         },
         {
-      name: "Двигатель",
-      price: null,
-      quantity: 1,
-      children: [
-        {
-          name: "Поршни",
-          price: 10000,
-          quantity: 5,
+          name: "Двигатель",
+          price: 0,
+          quantity: 1,
           children: [
             {
-              name: "Кольца",
-              price: 2000,
-              quantity: 3
+              name: "Поршни",
+              price: 10000,
+              quantity: 5,
+              children: [
+                {
+                  name: "Кольца",
+                  price: 2000,
+                  quantity: 3
+                }
+              ]
             }
           ]
         },
         {
-  name: "Салон",
-  price: null,
-  quantity: 1,
-  children: [
-    {
-      name: "Чехлы",
-      price: 10000,
-      quantity: 5
-    },
-    {
-      name: "Полики",
-      price: 2000,
-      quantity: 3
-    }
-  ]
-}
-      ]
-    }
-      ],
-      
-
-    };
-  },
-  created() {
-    this.sumItems();
-  },
-  methods: {
-    sumItems() {
-      for (const item of this.itemes) {
-        let price = 0;
-        if (item.children) {
-          for (const child of item.children) {
-            let child_price = 0;
-            if (child.children) {
-              for (const childer of child.children) {
-                child_price += childer.price * childer.quantity;
-              }
-              child.price = child_price;
+          name: "Салон",
+          price: 0,
+          quantity: 1,
+          children: [
+            {
+              name: "Чехлы",
+              price: 10000,
+              quantity: 5
+            },
+            {
+              name: "Полики",
+              price: 2000,
+              quantity: 3
             }
-            price += child.price * child.quantity;
-          }
+          ]
         }
-        item.price = price
-      }
+      ];
+    },
+
+    // Сохранение данных в localStorage
+    saveItems() {
+      localStorage.setItem('itemes', JSON.stringify(this.itemes));
+    },
+
+    sumItems() {
+      this.itemes.forEach(item => {
+        item.price = item.children.reduce((acc, child) => {
+          let childPrice = child.price * child.quantity;
+          if (child.children) {
+            childPrice += child.children.reduce((chAcc, childer) => chAcc + (childer.price * childer.quantity), 0);
+          }
+          return acc + childPrice;
+        }, 0);
+      });
+      this.saveItems(); // Сохраняем данные после пересчета
     },
 
     addQuantity(item) {
@@ -206,175 +211,240 @@ export default {
         this.sumItems();
       }
     },
+    
+    addItem() {
+      const newItem = {
+        name: this.newItemName,
+        price: this.newItemPrice,
+        quantity: this.newItemQuantity,
+        children: []
+      };
+
+      if (this.parentItem) {
+        this.parentItem.children.push(newItem);
+      } else {
+        this.itemes.push(newItem);
+      }
+
+      // Сброс значений формы
+      this.newItemName = '';
+      this.newItemPrice = null;
+      this.newItemQuantity = null;
+      this.parentItem = null;
+
+      this.sumItems();
+    },
+
+    updateParentItem() {
+      // Обновление выбранного родительского элемента
+    },
+
     exportToExcel() {
-      // Данные для таблицы
       const data = [];
       for (const item of this.itemes) {
-        data.push({ "name": item.name, "price": item.price, "quantity": item.quantity, "total": item.price * item.quantity })
+        data.push({ "name": item.name, "price": item.price, "quantity": item.quantity, "total": item.price * item.quantity });
         if (item.children) {
           for (const child of item.children) {
             data.push({ "name": child.name, "price": child.price, "quantity": child.quantity, "total": child.price * child.quantity });
             if (child.children) {
               for (const childish of child.children) {
-                data.push({ "name": childish.name, "price": childish.price, "quantity": childish.quantity, "total": childish.price * childish.quantity }); 
+                data.push({ "name": childish.name, "price": childish.price, "quantity": childish.quantity, "total": childish.price * childish.quantity });
               }
             }
           }
         }
       }
 
-      // Преобразуем данные в формат Excel
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Товары");
 
-      // Генерируем и загружаем файл
       XLSX.writeFile(workbook, 'table_data.xlsx');
     }
+  },
+  created() {
+    this.sumItems(); // Пересчитываем стоимость
   }
 };
 </script>
+
 
 <style>
 * {
   margin: 10px;
   padding: 10px;
   box-sizing: border-box;
-  color: black;
 }
 
 body {
-  font-family: Arial, sans-serif;
+  font-family: 'Arial', sans-serif;
   line-height: 1.6;
+  background-color: #f0f4f8; /* Светлый фон для большей контрастности */
+  color: #343a40;
 }
 
 header {
-  background-color: #333;
+  background-color: #007bff; /* Яркий цвет для заголовка */
   color: #fff;
-  padding: 10px 0;
+  padding: 20px 0;
   text-align: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Тень для заголовка */
 }
 
 header h1 {
   margin-bottom: 10px;
+  font-size: 2.5em; /* Увеличенный размер шрифта */
 }
 
 nav ul {
   list-style: none;
   display: flex;
   justify-content: center;
+  margin-top: 10px;
 }
 
 nav ul li {
-  margin: 0 15px;
+  margin: 0 20px;
 }
 
 nav ul li a {
   color: #fff;
   text-decoration: none;
-  font-size: 18px;
+  font-size: 1.2em; /* Увеличенный размер шрифта для ссылок */
+  padding: 5px 10px;
+  border-radius: 5px; /* Закругленные углы для ссылок */
+  transition: background-color 0.3s; /* Плавный переход */
+}
+
+nav ul li a:hover {
+  background-color: rgba(255, 255, 255, 0.2); /* Эффект наведения */
 }
 
 .hero {
-  background-color: #f4f4f4;
-  padding: 50px 0;
+  background-color: #343a40;
+  color: white;
+  padding: 80px 20px; /* Увеличенное внутреннее пространство */
   text-align: center;
 }
 
 .hero h2 {
-  font-size: 36px;
-  margin-bottom: 10px;
-}
-
-.hero p {
-  font-size: 18px;
-  margin-bottom: 20px;
+  font-size: 2.5em; /* Увеличенный размер заголовка */
 }
 
 .btn {
-  background-color: #333;
+  background-color: #28a745; /* Зелёный цвет для кнопок */
   color: #fff;
-  padding: 10px 20px;
+  padding: 15px 30px; /* Увеличенное внутреннее пространство */
   text-decoration: none;
   border-radius: 5px;
-  font-size: 16px;
+  font-size: 1.1em; /* Увеличенный размер шрифта для кнопок */
+  transition: background-color 0.3s; /* Плавный переход */
+}
+
+.btn:hover {
+  background-color: #218838; /* Тёмно-зелёный цвет при наведении */
 }
 
 .products {
-  padding: 50px;
-  background-color: #fff;
+  padding: 40px 20px;
 }
 
-.products h2 {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.product-list {
+.add-product-form {
   display: flex;
-  justify-content: space-around;
-}
-
-.product-item {
-  background-color: #f9f9f9;
+  flex-direction: column;
+  margin-bottom: 20px;
+  background-color: #ffffff; /* Белый фон для формы */
   padding: 20px;
-  text-align: center;
-  border: 1px solid #ddd;
+  border-radius: 5px; /* Закругленные углы */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Тень для формы */
+}
+
+.add-product-form input,
+.add-product-form select {
+  margin-bottom: 15px;
+  padding: 15px;
+  border: 1px solid #ced4da;
   border-radius: 5px;
-  width: 30%;
+  font-size: 1em; /* Размер шрифта для вводимых полей */
 }
 
-.product-item h3 {
-  margin-bottom: 10px;
-
-
+.add-btn,
+.export-btn {
+  background-color: #007bff; /* Яркий цвет для кнопок */
+  color: #fff;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1.1em; /* Увеличенный размер шрифта для кнопок */
+  transition: background-color 0.3s; /* Плавный переход */
 }
-body {
-  font-family: Arial, sans-serif;
-  margin: 10px
+
+.add-btn:hover,
+.export-btn:hover {
+  background-color: #0056b3; /* Тёмно-синий цвет при наведении */
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 20px;
+  background-color: #ffffff; /* Белый фон для таблицы */
+  border-radius: 5px; /* Закругленные углы */
+  overflow: hidden; /* Убирает скругления от таблицы */
 }
 
-thead {
-  background-color: #f2f2f2;
-}
-
-th,
-td {
-  padding: 10px;
-  border: 1px solid #ddd;
+table th,
+table td {
+  border: 1px solid #dee2e6;
+  padding: 15px;
   text-align: left;
 }
 
-button {
-  margin-right: 5px;
-  padding: 5px 10px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #0056b3;
+table th {
+  background-color: #f8f9fa; /* Цвет заголовка таблицы */
+  font-weight: bold;
+  font-size: 1.1em; /* Увеличенный размер шрифта для заголовка */
 }
 
 .contact {
-  padding: 50px;
-  background-color: #f4f4f4;
+  background-color: #007bff; /* Цвет фона для контактов */
+  color: white;
+  padding: 40px 20px;
   text-align: center;
 }
 
-footer {
-  background-color: #333;
-  color: #fff;
-  padding: 20px 0;
-  text-align: center;
-  margin-top: 20px;
+.contact h2 {
+  margin-bottom: 20px; /* Промежуток между заголовком и текстом */
+  font-size: 2em; /* Увеличенный размер заголовка */
 }
+
+footer {
+  background-color: #343a40; /* Цвет фона для подвала */
+  color: white;
+  text-align: center;
+  padding: 15px 0;
+  position: relative; /* Позволяет подвалу оставаться на месте */
+}
+
+footer p {
+  margin: 0; /* Убирает отступы для текста в подвале */
+  font-size: 0.9em; /* Размер шрифта для текста в подвале */
+}
+
+/* Мобильная адаптация */
+@media (max-width: 768px) {
+  nav ul {
+    flex-direction: column; /* Вертикальная ориентация меню */
+  }
+
+  nav ul li {
+    margin: 10px 0; /* Увеличенный отступ между элементами */
+  }
+
+  .add-product-form {
+    margin: 0 10px; /* Отступы для формы на мобильных устройствах */
+  }
+}
+
 </style>
