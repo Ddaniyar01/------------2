@@ -41,6 +41,7 @@
             <th>Количество</th>
             <th>Стоимость</th>
             <th>Действия</th>
+            <th>Редактировать</th>
           </tr>
         </thead>
         <tbody>
@@ -54,6 +55,9 @@
                 <button @click="removeItem(item)">Удалить</button>
                 <button @click="addQuantity(item)">Добавить</button>
               </td>
+              <td>
+                <button @click="editItem(item)">Редактировать</button>
+              </td>
             </tr>
             <template v-for="child in item.children" :key="child.name">
               <tr>
@@ -64,6 +68,9 @@
                 <td>
                   <button @click="removeItem(child)">Удалить</button>
                   <button @click="addQuantity(child)">Добавить</button>
+                </td>
+                <td>
+                  <button @click="editItem(child)">Редактировать</button>
                 </td>
               </tr>
               <template v-for="childer in child.children" :key="childer.name">
@@ -76,6 +83,9 @@
                     <button @click="removeItem(childer)">Удалить</button>
                     <button @click="addQuantity(childer)">Добавить</button>
                   </td>
+                  <td>
+                    <button @click="editItem(childer)">Редактировать</button>
+                  </td>
                 </tr>
               </template>
             </template>
@@ -85,6 +95,16 @@
 
       <div>
         <button @click="exportToExcel" class="export-btn">Экспортировать в Excel</button>
+      </div>
+
+      <!-- Форма редактирования -->
+      <div v-if="editingItem" class="edit-product-form">
+        <h3>Редактировать товар: {{ editingItem.name }}</h3>
+        <input v-model="editingItem.name" placeholder="Название товара" />
+        <input type="number" v-model="editingItem.price" placeholder="Цена" />
+        <input type="number" v-model="editingItem.quantity" placeholder="Количество" />
+        <button @click="saveItem(editingItem)" class="save-btn">Сохранить</button>
+        <button @click="cancelEdit" class="cancel-btn">Отменить</button>
       </div>
     </section>
 
@@ -111,14 +131,18 @@ export default {
       newItemName: '',
       newItemPrice: null,
       newItemQuantity: null,
-      parentItem: null
+      parentItem: null,
+      editingItem: null,
     };
   },
   methods: {
-    // Загрузка данных из localStorage
     loadItems() {
       const savedItems = localStorage.getItem('itemes');
-      return savedItems ? JSON.parse(savedItems) : [
+      return savedItems ? JSON.parse(savedItems) : this.defaultItems();
+    },
+
+    defaultItems() {
+      return [
         {
           name: "Кузов",
           price: 0,
@@ -182,7 +206,6 @@ export default {
       ];
     },
 
-    // Сохранение данных в localStorage
     saveItems() {
       localStorage.setItem('itemes', JSON.stringify(this.itemes));
     },
@@ -206,12 +229,37 @@ export default {
     },
 
     removeItem(item) {
-      if (item.quantity > 1) {
-        item.quantity -= 1;
-        this.sumItems();
+      const parent = this.findParent(item);
+      if (parent) {
+        parent.children = parent.children.filter(child => child !== item);
+      } else {
+        this.itemes = this.itemes.filter(i => i !== item);
       }
+      this.sumItems();
     },
-    
+
+    findParent(item) {
+      for (let i = 0; i < this.itemes.length; i++) {
+        if (this.itemes[i].children.includes(item)) {
+          return this.itemes[i];
+        }
+        const child = this.findParentInChildren(this.itemes[i].children, item);
+        if (child) return child;
+      }
+      return null;
+    },
+
+    findParentInChildren(children, item) {
+      for (const child of children) {
+        if (child.children.includes(item)) {
+          return child;
+        }
+        const result = this.findParentInChildren(child.children, item);
+        if (result) return result;
+      }
+      return null;
+    },
+
     addItem() {
       const newItem = {
         name: this.newItemName,
@@ -231,43 +279,41 @@ export default {
       this.newItemPrice = null;
       this.newItemQuantity = null;
       this.parentItem = null;
-
       this.sumItems();
     },
 
-    updateParentItem() {
-      // Обновление выбранного родительского элемента
+    editItem(item) {
+      this.editingItem = item;
+    },
+
+    saveItem(item) {
+      this.editingItem = null;
+      this.saveItems();
+      this.sumItems();
+    },
+
+    cancelEdit() {
+      this.editingItem = null;
     },
 
     exportToExcel() {
-      const data = [];
-      for (const item of this.itemes) {
-        data.push({ "name": item.name, "price": item.price, "quantity": item.quantity, "total": item.price * item.quantity });
-        if (item.children) {
-          for (const child of item.children) {
-            data.push({ "name": child.name, "price": child.price, "quantity": child.quantity, "total": child.price * child.quantity });
-            if (child.children) {
-              for (const childish of child.children) {
-                data.push({ "name": childish.name, "price": childish.price, "quantity": childish.quantity, "total": childish.price * childish.quantity });
-              }
-            }
-          }
-        }
-      }
+      const ws = XLSX.utils.json_to_sheet(this.itemes.map(item => ({
+        "Деталь": item.name,
+        "Цена": item.price,
+        "Количество": item.quantity,
+        "Стоимость": item.price * item.quantity,
+      })));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Товары");
+      XLSX.writeFile(wb, "товары.xlsx");
+    },
 
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Товары");
-
-      XLSX.writeFile(workbook, 'table_data.xlsx');
+    updateParentItem() {
+      // Ничего не делаем, просто функция для onChange
     }
   },
-  created() {
-    this.sumItems(); // Пересчитываем стоимость
-  }
 };
 </script>
-
 
 <style>
 * {
@@ -447,4 +493,4 @@ footer p {
   }
 }
 
-</style>
+</style> 
