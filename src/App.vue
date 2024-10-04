@@ -52,7 +52,7 @@
               <td>{{ item.quantity }}</td>
               <td>{{ item.price * item.quantity }}</td>
               <td>
-                <button @click="removeItem(item)">Удалить</button>
+                <button @click="reduceQuantity(item)">Удалить</button>
                 <button @click="addQuantity(item)">Добавить</button>
               </td>
               <td>
@@ -66,7 +66,7 @@
                 <td>{{ child.quantity }}</td>
                 <td>{{ child.price * child.quantity }}</td>
                 <td>
-                  <button @click="removeItem(child)">Удалить</button>
+                  <button @click="reduceQuantity(child)">Удалить</button>
                   <button @click="addQuantity(child)">Добавить</button>
                 </td>
                 <td>
@@ -80,7 +80,7 @@
                   <td>{{ childer.quantity }}</td>
                   <td>{{ childer.price * childer.quantity }}</td>
                   <td>
-                    <button @click="removeItem(childer)">Удалить</button>
+                    <button @click="reduceQuantity(childer)">Удалить</button>
                     <button @click="addQuantity(childer)">Добавить</button>
                   </td>
                   <td>
@@ -104,6 +104,7 @@
         <input type="number" v-model="editingItem.price" placeholder="Цена" />
         <input type="number" v-model="editingItem.quantity" placeholder="Количество" />
         <button @click="saveItem(editingItem)" class="save-btn">Сохранить</button>
+        <button @click="removeEditingItem" class="remove-btn">Удалить</button>
         <button @click="cancelEdit" class="cancel-btn">Отменить</button>
       </div>
     </section>
@@ -134,6 +135,9 @@ export default {
       parentItem: null,
       editingItem: null,
     };
+  },
+  mounted() {
+    this.sumItems();
   },
   methods: {
     loadItems() {
@@ -220,7 +224,7 @@ export default {
           return acc + childPrice;
         }, 0);
       });
-      this.saveItems(); // Сохраняем данные после пересчета
+      this.saveItems();
     },
 
     addQuantity(item) {
@@ -228,12 +232,12 @@ export default {
       this.sumItems();
     },
 
-    removeItem(item) {
-      const parent = this.findParent(item);
-      if (parent) {
-        parent.children = parent.children.filter(child => child !== item);
+    // Измененный метод для уменьшения количества
+    reduceQuantity(item) {
+      if (item.quantity > 1) {
+        item.quantity -= 1;
       } else {
-        this.itemes = this.itemes.filter(i => i !== item);
+        alert('Количество не может быть меньше 1');
       }
       this.sumItems();
     },
@@ -263,8 +267,8 @@ export default {
     addItem() {
       const newItem = {
         name: this.newItemName,
-        price: this.newItemPrice,
-        quantity: this.newItemQuantity,
+        price: Number(this.newItemPrice),
+        quantity: Number(this.newItemQuantity),
         children: []
       };
 
@@ -273,13 +277,15 @@ export default {
       } else {
         this.itemes.push(newItem);
       }
+      this.resetNewItemFields();
+      this.sumItems();
+    },
 
-      // Сброс значений формы
+    resetNewItemFields() {
       this.newItemName = '';
       this.newItemPrice = null;
       this.newItemQuantity = null;
       this.parentItem = null;
-      this.sumItems();
     },
 
     editItem(item) {
@@ -287,33 +293,44 @@ export default {
     },
 
     saveItem(item) {
-      this.editingItem = null;
       this.saveItems();
-      this.sumItems();
+      this.editingItem = null;
     },
 
     cancelEdit() {
       this.editingItem = null;
     },
 
+    removeEditingItem() {
+      const parent = this.findParent(this.editingItem);
+      if (parent) {
+        parent.children = parent.children.filter(child => child !== this.editingItem);
+      } else {
+        this.itemes = this.itemes.filter(item => item !== this.editingItem);
+      }
+      this.editingItem = null;
+      this.sumItems();
+    },
+
     exportToExcel() {
       const ws = XLSX.utils.json_to_sheet(this.itemes.map(item => ({
-        "Деталь": item.name,
-        "Цена": item.price,
-        "Количество": item.quantity,
-        "Стоимость": item.price * item.quantity,
+        'Деталь': item.name,
+        'Цена': item.price,
+        'Количество': item.quantity,
+        'Стоимость': item.price * item.quantity
       })));
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Товары");
-      XLSX.writeFile(wb, "товары.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, 'Товары');
+      XLSX.writeFile(wb, 'Товары.xlsx');
     },
 
     updateParentItem() {
-      // Ничего не делаем, просто функция для onChange
+      // Update logic if needed
     }
-  },
+  }
 };
 </script>
+
 
 <style>
 * {
@@ -493,4 +510,4 @@ footer p {
   }
 }
 
-</style> 
+</style>
