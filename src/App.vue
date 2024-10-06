@@ -26,7 +26,7 @@
         <input v-model="newItemName" placeholder="Название товара" />
         <input type="number" v-model="newItemPrice" placeholder="Цена" />
         <input type="number" v-model="newItemQuantity" placeholder="Количество" />
-        <select v-model="parentItem" @change="updateParentItem">
+        <select v-model="parentItem">
           <option value="">Выберите родительский товар</option>
           <option v-for="item in itemes" :key="item.name" :value="item">{{ item.name }}</option>
         </select>
@@ -47,41 +47,42 @@
         <tbody>
           <template v-for="item in itemes" :key="item.name">
             <tr>
-              <td>{{ item.name }}</td>
+              <td :style="getIndentStyle(0)">{{ item.name }}</td>
               <td>{{ item.price }}</td>
               <td>{{ item.quantity }}</td>
               <td>{{ item.price * item.quantity }}</td>
               <td>
                 <button @click="reduceQuantity(item)">Удалить</button>
-                <button @click="addQuantity(item)">Добавить</button>
               </td>
               <td>
                 <button @click="editItem(item)">Редактировать</button>
               </td>
             </tr>
+
+            <!-- Вложенные элементы -->
             <template v-for="child in item.children" :key="child.name">
               <tr>
-                <td>{{ child.name }}</td>
+                <td :style="getIndentStyle(1)">{{ child.name }}</td>
                 <td>{{ child.price }}</td>
                 <td>{{ child.quantity }}</td>
                 <td>{{ child.price * child.quantity }}</td>
                 <td>
                   <button @click="reduceQuantity(child)">Удалить</button>
-                  <button @click="addQuantity(child)">Добавить</button>
                 </td>
                 <td>
                   <button @click="editItem(child)">Редактировать</button>
                 </td>
               </tr>
+
+              <!-- Дальнейшая вложенность -->
               <template v-for="childer in child.children" :key="childer.name">
                 <tr>
-                  <td>{{ childer.name }}</td>
+                  <td :style="getIndentStyle(2)">{{ childer.name }}</td>
                   <td>{{ childer.price }}</td>
                   <td>{{ childer.quantity }}</td>
                   <td>{{ childer.price * childer.quantity }}</td>
                   <td>
                     <button @click="reduceQuantity(childer)">Удалить</button>
-                    <button @click="addQuantity(childer)">Добавить</button>
                   </td>
                   <td>
                     <button @click="editItem(childer)">Редактировать</button>
@@ -103,7 +104,7 @@
         <input v-model="editingItem.name" placeholder="Название товара" />
         <input type="number" v-model="editingItem.price" placeholder="Цена" />
         <input type="number" v-model="editingItem.quantity" placeholder="Количество" />
-        <button @click="saveItem(editingItem)" class="save-btn">Сохранить</button>
+        <button @click="saveItem" class="save-btn">Сохранить</button>
         <button @click="removeEditingItem" class="remove-btn">Удалить</button>
         <button @click="cancelEdit" class="cancel-btn">Отменить</button>
       </div>
@@ -232,7 +233,6 @@ export default {
       this.sumItems();
     },
 
-    // Измененный метод для уменьшения количества
     reduceQuantity(item) {
       if (item.quantity > 1) {
         item.quantity -= 1;
@@ -240,28 +240,6 @@ export default {
         alert('Количество не может быть меньше 1');
       }
       this.sumItems();
-    },
-
-    findParent(item) {
-      for (let i = 0; i < this.itemes.length; i++) {
-        if (this.itemes[i].children.includes(item)) {
-          return this.itemes[i];
-        }
-        const child = this.findParentInChildren(this.itemes[i].children, item);
-        if (child) return child;
-      }
-      return null;
-    },
-
-    findParentInChildren(children, item) {
-      for (const child of children) {
-        if (child.children.includes(item)) {
-          return child;
-        }
-        const result = this.findParentInChildren(child.children, item);
-        if (result) return result;
-      }
-      return null;
     },
 
     addItem() {
@@ -279,6 +257,7 @@ export default {
       }
       this.resetNewItemFields();
       this.sumItems();
+      this.updateParentItemOptions();
     },
 
     resetNewItemFields() {
@@ -288,226 +267,301 @@ export default {
       this.parentItem = null;
     },
 
+    updateParentItemOptions() {
+      // Обновление родительского элемента для корректного отображения
+      this.parentItem = null;
+    },
+
     editItem(item) {
       this.editingItem = item;
     },
 
-    saveItem(item) {
-      this.saveItems();
+    saveItem() {
+      this.saveItems(); // Сохранение после редактирования
       this.editingItem = null;
+      this.sumItems(); // Пересчет общей стоимости
+    },
+
+    removeEditingItem() {
+      if (confirm('Вы уверены, что хотите удалить этот товар?')) {
+        const parent = this.findParent(this.itemes, this.editingItem);
+        if (parent) {
+          const index = parent.children.indexOf(this.editingItem);
+          parent.children.splice(index, 1);
+        } else {
+          const index = this.itemes.indexOf(this.editingItem);
+          this.itemes.splice(index, 1);
+        }
+        this.editingItem = null;
+        this.sumItems(); // Пересчет общей стоимости
+      }
+    },
+
+    findParent(items, child) {
+      for (const item of items) {
+        if (item.children.includes(child)) {
+          return item;
+        }
+        const found = this.findParent(item.children, child);
+        if (found) return found;
+      }
+      return null;
     },
 
     cancelEdit() {
       this.editingItem = null;
     },
 
-    removeEditingItem() {
-      const parent = this.findParent(this.editingItem);
-      if (parent) {
-        parent.children = parent.children.filter(child => child !== this.editingItem);
-      } else {
-        this.itemes = this.itemes.filter(item => item !== this.editingItem);
-      }
-      this.editingItem = null;
-      this.sumItems();
-    },
-
     exportToExcel() {
-      const ws = XLSX.utils.json_to_sheet(this.itemes.map(item => ({
-        'Деталь': item.name,
-        'Цена': item.price,
-        'Количество': item.quantity,
-        'Стоимость': item.price * item.quantity
-      })));
+      const ws = XLSX.utils.json_to_sheet(this.itemes);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Товары');
-      XLSX.writeFile(wb, 'Товары.xlsx');
+      XLSX.writeFile(wb, 'товары.xlsx');
     },
 
-    updateParentItem() {
-      // Update logic if needed
+    getIndentStyle(level) {
+      return {
+        paddingLeft: `${level * 20}px`,
+      };
     }
   }
 };
 </script>
 
-
 <style>
 * {
-  margin: 10px;
-  padding: 10px;
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
+  font-family: 'Arial', sans-serif;
 }
 
 body {
-  font-family: 'Arial', sans-serif;
-  line-height: 1.6;
-  background-color: #f0f4f8; /* Светлый фон для большей контрастности */
-  color: #343a40;
+  background-color: #f9f9f9; /* Светлый фон для удобства восприятия */
+  color: #333;
 }
 
 header {
-  background-color: #007bff; /* Яркий цвет для заголовка */
-  color: #fff;
+  background-color: #3e3e3e; /* Тёмно-серый цвет */
+  color: #ffffff; /* Белый текст для контраста */
   padding: 20px 0;
   text-align: center;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Тень для заголовка */
 }
 
-header h1 {
-  margin-bottom: 10px;
-  font-size: 2.5em; /* Увеличенный размер шрифта */
+header .logo h1 {
+  font-size: 2rem;
+  margin: 0;
 }
 
-nav ul {
+header nav ul {
   list-style: none;
+  padding: 0;
   display: flex;
   justify-content: center;
   margin-top: 10px;
 }
 
-nav ul li {
+header nav ul li {
   margin: 0 20px;
 }
 
-nav ul li a {
-  color: #fff;
+header nav ul li a {
+  color: #ffffff; /* Белый цвет для ссылок */
   text-decoration: none;
-  font-size: 1.2em; /* Увеличенный размер шрифта для ссылок */
-  padding: 5px 10px;
-  border-radius: 5px; /* Закругленные углы для ссылок */
-  transition: background-color 0.3s; /* Плавный переход */
+  font-size: 1.1rem;
+  transition: color 0.3s;
 }
 
-nav ul li a:hover {
-  background-color: rgba(255, 255, 255, 0.2); /* Эффект наведения */
+header nav ul li a:hover {
+  color: #f0f0f0; /* Чуть более светлый оттенок при наведении */
 }
 
 .hero {
-  background-color: #343a40;
-  color: white;
-  padding: 80px 20px; /* Увеличенное внутреннее пространство */
+  background-color: #424242; /* Тёмно-серый фон для раздела */
+  padding: 50px;
   text-align: center;
+  color: #ffffff; /* Белый текст для контраста */
 }
 
 .hero h2 {
-  font-size: 2.5em; /* Увеличенный размер заголовка */
+  font-size: 2.5rem;
+  margin-bottom: 20px;
 }
 
-.btn {
-  background-color: #28a745; /* Зелёный цвет для кнопок */
-  color: #fff;
-  padding: 15px 30px; /* Увеличенное внутреннее пространство */
-  text-decoration: none;
+.hero p {
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+}
+
+.hero .btn {
+  background-color: #ff5722; /* Яркий оранжевый цвет */
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
   border-radius: 5px;
-  font-size: 1.1em; /* Увеличенный размер шрифта для кнопок */
-  transition: background-color 0.3s; /* Плавный переход */
+  transition: background-color 0.3s;
 }
 
-.btn:hover {
-  background-color: #218838; /* Тёмно-зелёный цвет при наведении */
+.hero .btn:hover {
+  background-color: #e64a19; /* Более тёмный оттенок при наведении */
 }
 
 .products {
-  padding: 40px 20px;
+  padding: 50px;
+  background-color: #ffffff; /* Белый фон для продуктов */
+  margin-top: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.products h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 40px;
+  color: #424242; /* Тёмно-серый для заголовка */
 }
 
 .add-product-form {
   display: flex;
-  flex-direction: column;
-  margin-bottom: 20px;
-  background-color: #ffffff; /* Белый фон для формы */
-  padding: 20px;
-  border-radius: 5px; /* Закругленные углы */
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Тень для формы */
+  justify-content: space-around;
+  margin-bottom: 30px;
+  gap: 20px;
 }
 
 .add-product-form input,
 .add-product-form select {
-  margin-bottom: 15px;
-  padding: 15px;
-  border: 1px solid #ced4da;
+  padding: 10px;
+  font-size: 1rem;
   border-radius: 5px;
-  font-size: 1em; /* Размер шрифта для вводимых полей */
+  border: 1px solid #ccc; /* Светло-серый цвет рамки */
+  color: #333;
 }
 
-.add-btn,
-.export-btn {
-  background-color: #007bff; /* Яркий цвет для кнопок */
-  color: #fff;
-  padding: 12px;
+.add-product-form .add-btn {
+  background-color: #2196f3; /* Яркий синий цвет */
+  color: white;
+  padding: 10px 20px;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
-  font-size: 1.1em; /* Увеличенный размер шрифта для кнопок */
-  transition: background-color 0.3s; /* Плавный переход */
+  border-radius: 5px;
+  transition: background-color 0.3s;
 }
 
-.add-btn:hover,
-.export-btn:hover {
-  background-color: #0056b3; /* Тёмно-синий цвет при наведении */
+.add-product-form .add-btn:hover {
+  background-color: #1976d2; /* Более тёмный синий при наведении */
+}
+
+.table-container {
+  max-width: 100%;
+  overflow-x: auto;
+  background-color: #ffffff; /* Белый фон для контейнера */
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 20px;
-  background-color: #ffffff; /* Белый фон для таблицы */
-  border-radius: 5px; /* Закругленные углы */
-  overflow: hidden; /* Убирает скругления от таблицы */
 }
 
-table th,
-table td {
-  border: 1px solid #dee2e6;
-  padding: 15px;
+table thead th {
+  background-color: #e0e0e0; /* Светло-серый для заголовков */
+  color: #424242;
+  padding: 12px;
   text-align: left;
+  font-size: 1.1rem;
 }
 
-table th {
-  background-color: #f8f9fa; /* Цвет заголовка таблицы */
-  font-weight: bold;
-  font-size: 1.1em; /* Увеличенный размер шрифта для заголовка */
+table tbody tr {
+  background-color: #fafafa; /* Очень светлый серый для строк */
+}
+
+table tbody tr:nth-child(even) {
+  background-color: #f5f5f5; /* Легкий оттенок для четных строк */
+}
+
+table td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd; /* Светло-серый цвет границы */
+}
+
+table td button {
+  background-color: #ff5722; /* Яркий оранжевый цвет */
+  color: white;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+table td button:hover {
+  background-color: #e64a19; /* Более тёмный оттенок при наведении */
+}
+
+.edit-product-form {
+  background-color: #f5f5f5; /* Светло-серый фон для формы редактирования */
+  padding: 20px;
+  margin-top: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.edit-product-form input {
+  padding: 10px;
+  margin-bottom: 15px;
+  width: 100%;
+  border-radius: 5px;
+  border: 1px solid #ccc; /* Светло-серый цвет рамки */
+}
+
+.edit-product-form button {
+  background-color: #2196f3; /* Яркий синий цвет */
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 10px;
+  transition: background-color 0.3s;
+}
+
+.edit-product-form button:hover {
+  background-color: #1976d2; /* Более тёмный синий при наведении */
 }
 
 .contact {
-  background-color: #007bff; /* Цвет фона для контактов */
-  color: white;
-  padding: 40px 20px;
-  text-align: center;
+  padding: 50px;
+  background-color: #ffffff; /* Белый фон для контактов */
+  margin-top: 20px;
 }
 
 .contact h2 {
-  margin-bottom: 20px; /* Промежуток между заголовком и текстом */
-  font-size: 2em; /* Увеличенный размер заголовка */
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 40px;
+  color: #424242; /* Тёмно-серый для заголовка */
+}
+
+.contact p {
+  font-size: 1.2rem;
+  text-align: center;
+  margin-bottom: 15px;
 }
 
 footer {
-  background-color: #343a40; /* Цвет фона для подвала */
-  color: white;
+  background-color: #3e3e3e; /* Тёмно-серый цвет */
+  color: #ffffff; /* Белый текст для контраста */
   text-align: center;
   padding: 15px 0;
-  position: relative; /* Позволяет подвалу оставаться на месте */
+  margin-top: 50px;
 }
 
 footer p {
-  margin: 0; /* Убирает отступы для текста в подвале */
-  font-size: 0.9em; /* Размер шрифта для текста в подвале */
-}
-
-/* Мобильная адаптация */
-@media (max-width: 768px) {
-  nav ul {
-    flex-direction: column; /* Вертикальная ориентация меню */
-  }
-
-  nav ul li {
-    margin: 10px 0; /* Увеличенный отступ между элементами */
-  }
-
-  .add-product-form {
-    margin: 0 10px; /* Отступы для формы на мобильных устройствах */
-  }
+  margin: 0;
+  font-size: 1rem;
 }
 
 </style>
