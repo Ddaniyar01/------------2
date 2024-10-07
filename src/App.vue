@@ -27,13 +27,12 @@
         <input type="number" v-model="newItemPrice" placeholder="Цена" />
         <input type="number" v-model="newItemQuantity" placeholder="Количество" />
         <select v-model="parentItem">
-          <option value="">Выберите родительский товар</option>
+          <option selected disabled value="">Выберите родительский товар</option>
           <option v-for="item in items" :key="item.name" :value="item">{{ item.name }}</option>
         </select>
-        <select v-model="itemType">
-          <option value="regular">Обычный товар</option>
-          <option value="parent">Родительский товар</option>
-          <option value="child">Дочерний товар</option>
+        <select v-if="parentItem" v-model="childItem">
+          <option selected disabled value="">Выберите подродительский товар</option>
+          <option v-for="child in parentItem.children" :key="child.name" :value="child">{{ child.name }}</option>
         </select>
         <button @click="addItem" class="add-btn">Добавить товар</button>
       </div>
@@ -57,7 +56,7 @@
               <td>{{ calculateTotal(item) }}</td>
               <td>
                 <button @click="editItem(item)">Редактировать</button>
-                <button @click="removeItem(item)">Удалить</button>
+                <!-- <button @click="removeItem(item)">Удалить</button> -->
               </td>
             </tr>
             <template v-for="child in item.children" :key="child.name">
@@ -68,7 +67,7 @@
                 <td>{{ calculateTotal(child) }}</td>
                 <td>
                   <button @click="editItem(child)">Редактировать</button>
-                  <button @click="removeItem(child)">Удалить</button>
+                  <!-- <button @click="removeItem(child)">Удалить</button> -->
                 </td>
               </tr>
               <template v-for="grandChild in child.children" :key="grandChild.name">
@@ -79,7 +78,7 @@
                   <td>{{ calculateTotal(grandChild) }}</td>
                   <td>
                     <button @click="editItem(grandChild)">Редактировать</button>
-                    <button @click="removeItem(grandChild)">Удалить</button>
+                    <!-- <button @click="removeItem(grandChild)">Удалить</button> -->
                   </td>
                 </tr>
               </template>
@@ -95,6 +94,7 @@
         <input type="number" v-model="editingItem.price" placeholder="Цена" />
         <input type="number" v-model="editingItem.quantity" @input="validateQuantity" placeholder="Количество" />
         <button @click="saveEdit">Сохранить изменения</button>
+        <button @click="removeItem(editingItem)">Удалить</button> <!-- Удаление редактируемого товара -->
         <button @click="closeEditModal">Отмена</button>
       </div>
     </section>
@@ -121,9 +121,13 @@ export default {
       newItemPrice: null,
       newItemQuantity: null,
       parentItem: null,
+      childItem: null,
       itemType: 'regular', // Тип добавляемого товара
       editingItem: null, // Текущий редактируемый товар
     };
+  },
+  mounted() {
+    this.sumItems();
   },
   methods: {
     loadItems() {
@@ -132,7 +136,68 @@ export default {
     },
 
     defaultItems() {
-      return [];
+      return [
+        {
+          name: "Кузов",
+          price: 0,
+          quantity: 2,
+          children: [
+            {
+              name: "Двери",
+              price: 10000,
+              quantity: 3,
+              children: [
+                {
+                  name: "Замок",
+                  price: 5000,
+                  quantity: 4
+                },
+                {
+                  name: "Ручки",
+                  price: 6000,
+                  quantity: 6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          name: "Двигатель",
+          price: 0,
+          quantity: 1,
+          children: [
+            {
+              name: "Поршни",
+              price: 10000,
+              quantity: 5,
+              children: [
+                {
+                  name: "Кольца",
+                  price: 2000,
+                  quantity: 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          name: "Салон",
+          price: 0,
+          quantity: 1,
+          children: [
+            {
+              name: "Чехлы",
+              price: 10000,
+              quantity: 5
+            },
+            {
+              name: "Полики",
+              price: 2000,
+              quantity: 3
+            }
+          ]
+        }
+      ];
     },
 
     saveItems() {
@@ -145,36 +210,56 @@ export default {
         return;
       }
 
-      const newItem = {
-        name: this.newItemName,
-        price: Number(this.newItemPrice),
-        quantity: Number(this.newItemQuantity),
-        children: [],
-      };
-
-      if (this.itemType === 'parent') {
-        this.items.push(newItem);
-      } else if (this.itemType === 'child' && this.parentItem) {
-        this.parentItem.children.push(newItem);
-      } else {
-        if (this.parentItem) {
-          this.parentItem.children.push(newItem);
+      if (this.parentItem) {
+        if (this.childItem) {
+          const newItem = {
+            name: this.newItemName,
+            price: Number(this.newItemPrice),
+            quantity: Number(this.newItemQuantity)
+          };
+          this.childItem.children.push(newItem)
         } else {
-          this.items.push(newItem);
+          const newItem = {
+            name: this.newItemName,
+            price: Number(this.newItemPrice),
+            quantity: Number(this.newItemQuantity),
+            children: []
+          };
+          this.parentItem.children.push(newItem)
         }
+      } else {
+        const newItem = {
+          name: this.newItemName,
+          price: Number(this.newItemPrice),
+          quantity: Number(this.newItemQuantity),
+          children: []
+        };
+        this.items.push(newItem);
       }
 
       // Обновляем количество для всех родительских элементов
-      this.updateParentQuantity(this.parentItem, newItem.quantity);
+      this.sumItems();
       this.resetNewItemFields();
       this.saveItems();
     },
 
-    updateParentQuantity(item, quantity) {
-      while (item) {
-        item.quantity += quantity;
-        item = this.items.find(i => i.children.includes(item));
-      }
+    sumItems() {
+      this.items.forEach(item => {
+        let parent_price = 0;
+        if (item.children && item.children.length > 0) {
+          item.children.forEach(child => {
+            let child_price = 0;
+            if (child.children && child.children.length > 0) {
+              child.children.forEach(childish => {
+                child_price += childish.quantity * childish.price;
+              });
+              child.price = child_price;
+            }
+            parent_price += child.quantity * child.price;
+          });
+          item.price = parent_price;
+        };
+      })
     },
 
     resetNewItemFields() {
@@ -182,27 +267,12 @@ export default {
       this.newItemPrice = null;
       this.newItemQuantity = null;
       this.parentItem = null;
-      this.itemType = 'regular'; // Сброс типа добавляемого товара
+      this.childItem = null;
+      this.itemType = 'regular'; // Сброс типа товара
     },
 
-    removeItem(itemToRemove) {
-      if (itemToRemove.quantity > 1) {
-        itemToRemove.quantity -= 1;
-      } else {
-        const removeItemRecursively = (items) => {
-          return items.filter(item => {
-            if (item === itemToRemove) {
-              return false;
-            }
-            item.children = removeItemRecursively(item.children);
-            return true;
-          });
-        };
-
-        this.items = removeItemRecursively(this.items);
-      }
-
-      this.saveItems();
+    calculateTotal(item) {
+      return item.price * item.quantity;
     },
 
     editItem(item) {
@@ -210,49 +280,38 @@ export default {
     },
 
     saveEdit() {
-      if (this.editingItem) {
-        // Обновляем количество для дочерних и родительских элементов
-        const oldQuantity = this.editingItem.quantity;
-        const newQuantity = this.editingItem.quantity;
-
-        // Если количество изменилось, обновляем родительские и дочерние товары
-        if (oldQuantity !== newQuantity) {
-          this.updateParentQuantityOnEdit(this.editingItem, newQuantity - oldQuantity);
-        }
-      }
-
-      this.editingItem = null;
-      this.saveItems();
-    },
-
-    validateQuantity() {
-      // Если количество меньше 1, установить его в 1
-      if (this.editingItem && this.editingItem.quantity < 1) {
-        this.editingItem.quantity = 1;
-      }
-    },
-
-    updateParentQuantityOnEdit(item, quantityDifference) {
-      // Обновляем количество для родительского товара
-      let parent = this.items.find(i => i.children.includes(item));
-      while (parent) {
-        parent.quantity += quantityDifference;
-        parent = this.items.find(i => i.children.includes(parent));
-      }
-
-      // Обновляем количество для дочерних товаров
-      item.children.forEach(child => {
-        child.quantity += quantityDifference;
-        this.updateParentQuantityOnEdit(child, quantityDifference); // Для дочерних дочерних товаров
-      });
+      this.saveItems(); // Сохраняем изменения после редактирования
+      this.sumItems(); // Пересчитываем сумму после редактирования
+      this.closeEditModal();
     },
 
     closeEditModal() {
       this.editingItem = null;
     },
 
-    calculateTotal(item) {
-      return item.price * item.quantity;
+    validateQuantity() {
+      if (this.editingItem.quantity < 0) {
+        this.editingItem.quantity = 0; // Устанавливаем количество в 0, если оно отрицательное
+      }
+    },
+
+    findParent(item) {
+      return this.items.find(i => i.children && i.children.includes(item));
+    },
+
+    removeItem(item) {
+      const parent = this.findParent(item);
+      if (parent) {
+        // Удаляем элемент из родителя
+        parent.children = parent.children.filter(child => child !== item);
+      } else {
+        // Если элемент не имеет родителя, удаляем его из основного списка
+        this.items = this.items.filter(i => i !== item);
+      }
+      
+      this.saveItems(); // Сохраняем изменения в локальном хранилище
+      this.closeEditModal(); // Закрываем модальное окно редактирования
+      this.sumItems(); // Пересчитываем сумму после удаления
     },
   },
 };
