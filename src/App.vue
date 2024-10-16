@@ -300,19 +300,23 @@ export default {
     },
 
     removeItem(item) {
-      const parent = this.findParent(item);
-      if (parent) {
-        // Удаляем элемент из родителя
-        parent.children = parent.children.filter(child => child !== item);
-      } else {
-        // Если элемент не имеет родителя, удаляем его из основного списка
-        this.items = this.items.filter(i => i !== item);
+  const recursiveRemove = (items, target) => {
+    return items.filter(i => {
+      if (i === target) return false;
+      if (i.children) {
+        i.children = recursiveRemove(i.children, target);
       }
-      
-      this.saveItems(); // Сохраняем изменения в локальном хранилище
-      this.closeEditModal(); // Закрываем модальное окно редактирования
-      this.sumItems(); // Пересчитываем сумму после удаления
-    },
+      return true;
+    });
+  };
+
+  this.items = recursiveRemove(this.items, item);
+
+  this.saveItems(); // Сохраняем изменения в локальном хранилище
+  this.closeEditModal(); // Закрываем модальное окно редактирования
+  this.sumItems(); // Пересчитываем сумму после удаления
+},
+
   },
 };
 </script>
