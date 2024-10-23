@@ -98,31 +98,33 @@
       </div>
 
       <!-- Редактирование товара -->
-      <div v-if="editingItem" class="edit-product-form">
-        <h2>Редактировать товар</h2>
-        <input v-model="editingItem.name" placeholder="Название товара" />
-        <input type="number" v-model="editingItem.price" placeholder="Цена" />
-        <input type="number" v-model="editingItem.quantity" @input="validateQuantity" placeholder="Количество" />
-        
-        <select v-model="newParentItem">
-          <option selected disabled value="">Выберите нового родительского товар</option>
-          <option v-for="item in items" :key="item.name" :value="item">{{ item.name }}</option>
-        </select>
+<div v-if="editingItem" class="edit-product-form">
+  <h2>Редактировать товар</h2>
+  <input v-model="editingItem.name" placeholder="Название товара" />
+  <input type="number" v-model="editingItem.price" placeholder="Цена" />
+  <input type="number" v-model="editingItem.quantity" @input="validateQuantity" placeholder="Количество" />
+  
+  <select v-model="newParentItem">
+    <option selected disabled value="">Выберите нового родительского товар</option>
+    <option v-for="item in items" :key="item.name" :value="item">{{ item.name }}</option>
+  </select>
 
-        <select v-if="newParentItem" v-model="newChildItem">
-          <option selected disabled value="">Выберите нового подродительского товар</option>
-          <option v-for="child in newParentItem.children" :key="child.name" :value="child">{{ child.name }}</option>
-        </select>
+  <select v-if="newParentItem" v-model="newChildItem">
+    <option selected disabled value="">Выберите нового подродительского товар</option>
+    <option v-for="child in newParentItem.children" :key="child.name" :value="child">{{ child.name }}</option>
+  </select>
 
-        <select v-if="newChildItem" v-model="newGrandChildItem">
-          <option selected disabled value="">Выберите нового подподродительского товар</option>
-          <option v-for="grandChild in newChildItem.children" :key="grandChild.name" :value="grandChild">{{ grandChild.name }}</option>
-        </select>
+  <!-- Удаляем поле выбора подподродительского товара -->
+  <!-- <select v-if="newChildItem" v-model="newGrandChildItem">
+    <option selected disabled value="">Выберите нового подподродительского товар</option>
+    <option v-for="grandChild in newChildItem.children" :key="grandChild.name" :value="grandChild">{{ grandChild.name }}</option>
+  </select> -->
 
-        <button @click="saveEdit">Сохранить изменения</button>
-        <button @click="removeItem(editingItem)">Удалить</button>
-        <button @click="closeEditModal">Отмена</button>
-      </div>
+  <button @click="saveEdit">Сохранить изменения</button>
+  <button @click="removeItem(editingItem)">Удалить</button>
+  <button @click="closeEditModal">Отмена</button>
+</div>
+
     </section>
 
     <section id="contact" class="contact">
@@ -273,29 +275,35 @@ export default {
       this.newGrandChildItem = null;
     },
     saveEdit() {
-  const newItem = {
-    name: this.editingItem.name,
-    price: this.editingItem.price,
-    quantity: this.editingItem.quantity,
-    children: this.editingItem.children || [] // Сохраняем вложенных детей, если есть
-  };
-  
-  // Удаляем элемент из текущего места
-  this.removeItem(this.editingItem);
+  // Обновляем свойства существующего элемента, а не создаем новый
+  this.editingItem.name = this.editingItem.name;
+  this.editingItem.price = this.editingItem.price;
+  this.editingItem.quantity = this.editingItem.quantity;
 
-  // Проверяем, куда переместить элемент
-  if (this.newGrandChildItem) {
-    this.newGrandChildItem.children.push(newItem); // Добавляем как внука
-  } else if (this.newChildItem) {
-    this.newChildItem.children.push(newItem); // Добавляем как ребенка
-  } else if (this.newParentItem) {
-    this.newParentItem.children.push(newItem); // Добавляем как дочерний элемент родителя
-  } else {
-    this.items.push(newItem); // Если нет родителя, добавляем как корневой элемент
+  // Если меняем только данные — завершаем без перемещения
+  if (!this.newParentItem && !this.newChildItem && !this.newGrandChildItem) {
+    this.sumItems(); // Пересчитываем сумму
+    this.saveItems(); // Сохраняем изменения
+    this.closeEditModal(); // Закрываем модальное окно
+    return;
   }
 
-  this.sumItems(); // Пересчитываем суммы
-  this.saveItems(); // Сохраняем данные
+  // Если нужно переместить элемент в другой узел, удаляем из текущего места
+  this.removeItem(this.editingItem);
+
+  // Добавляем в новый узел в зависимости от уровня
+  if (this.newGrandChildItem) {
+    this.newGrandChildItem.children.push(this.editingItem);
+  } else if (this.newChildItem) {
+    this.newChildItem.children.push(this.editingItem);
+  } else if (this.newParentItem) {
+    this.newParentItem.children.push(this.editingItem);
+  } else {
+    this.items.push(this.editingItem);
+  }
+
+  this.sumItems(); // Пересчитываем сумму
+  this.saveItems(); // Сохраняем изменения
   this.closeEditModal(); // Закрываем модальное окно
 },
     removeItem(item) {
