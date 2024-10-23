@@ -16,26 +16,13 @@
     <section id="home" class="hero">
       <h2>Лучшие автозапчасти по доступным ценам!</h2>
       <p>Мы предлагаем качественные автозапчасти для всех марок автомобилей.</p>
-      <a href="#products" class="btn">Каталог товаров</a>
+      <a href="#products" class="btn" @click="openAddProductModal">Каталог товаров</a>
     </section>
 
     <section id="products" class="products">
       <h2>Наши товары</h2>
 
-      <div class="add-product-form">
-        <input v-model="newItemName" placeholder="Название товара" />
-        <input type="number" v-model="newItemPrice" placeholder="Цена" />
-        <input type="number" v-model="newItemQuantity" placeholder="Количество" />
-        <select v-model="parentItem">
-          <option selected disabled value="">Выберите родительский товар</option>
-          <option v-for="item in items" :key="item.name" :value="item">{{ item.name }}</option>
-        </select>
-        <select v-if="parentItem" v-model="childItem">
-          <option selected disabled value="">Выберите подродительский товар</option>
-          <option v-for="child in parentItem.children" :key="child.name" :value="child">{{ child.name }}</option>
-        </select>
-        <button @click="addItem" class="add-btn">Добавить товар</button>
-      </div>
+      <button @click="openAddProductModal" class="add-btn">Добавить товар</button>
 
       <table>
         <thead>
@@ -55,8 +42,7 @@
               <td>{{ item.quantity }}</td>
               <td>{{ calculateTotal(item) }}</td>
               <td>
-                <button @click="editItem(item)">Редактировать</button>
-                <!-- <button @click="removeItem(item)">Удалить</button> -->
+                <button @click="editItem(item, item)">Редактировать</button>
               </td>
             </tr>
             <template v-for="child in item.children" :key="child.name">
@@ -66,8 +52,7 @@
                 <td>{{ child.quantity }}</td>
                 <td>{{ calculateTotal(child) }}</td>
                 <td>
-                  <button @click="editItem(child)">Редактировать</button>
-                  <!-- <button @click="removeItem(child)">Удалить</button> -->
+                  <button @click="editItem(item, child)">Редактировать</button>
                 </td>
               </tr>
               <template v-for="grandChild in child.children" :key="grandChild.name">
@@ -77,8 +62,7 @@
                   <td>{{ grandChild.quantity }}</td>
                   <td>{{ calculateTotal(grandChild) }}</td>
                   <td>
-                    <button @click="editItem(grandChild)">Редактировать</button>
-                    <!-- <button @click="removeItem(grandChild)">Удалить</button> -->
+                    <button @click="editItem(item, grandChild)">Редактировать</button>
                   </td>
                 </tr>
               </template>
@@ -87,14 +71,56 @@
         </tbody>
       </table>
 
+      <!-- Модальное окно для добавления товара -->
+      <div v-if="isAddProductModalOpen" class="modal-overlay">
+        <div class="modal">
+          <h2>Добавить товар</h2>
+          <div class="add-product-form">
+            <input v-model="newItemName" placeholder="Название товара" />
+            <input type="number" v-model="newItemPrice" placeholder="Цена" />
+            <input type="number" v-model="newItemQuantity" placeholder="Количество" />
+            <select v-model="parentItem">
+              <option selected disabled value="">Выберите родительский товар</option>
+              <option v-for="item in items" :key="item.name" :value="item">{{ item.name }}</option>
+            </select>
+            <select v-if="parentItem" v-model="childItem">
+              <option selected disabled value="">Выберите подродительский товар</option>
+              <option v-for="child in parentItem.children" :key="child.name" :value="child">{{ child.name }}</option>
+            </select>
+            <select v-if="childItem" v-model="grandChildItem">
+              <option selected disabled value="">Выберите подподродительский товар</option>
+              <option v-for="grandChild in childItem.children" :key="grandChild.name" :value="grandChild">{{ grandChild.name }}</option>
+            </select>
+            <button @click="addItem" class="add-btn">Добавить товар</button>
+            <button @click="closeAddProductModal">Отмена</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Редактирование товара -->
       <div v-if="editingItem" class="edit-product-form">
         <h2>Редактировать товар</h2>
         <input v-model="editingItem.name" placeholder="Название товара" />
         <input type="number" v-model="editingItem.price" placeholder="Цена" />
         <input type="number" v-model="editingItem.quantity" @input="validateQuantity" placeholder="Количество" />
+        
+        <select v-model="newParentItem">
+          <option selected disabled value="">Выберите нового родительского товар</option>
+          <option v-for="item in items" :key="item.name" :value="item">{{ item.name }}</option>
+        </select>
+
+        <select v-if="newParentItem" v-model="newChildItem">
+          <option selected disabled value="">Выберите нового подродительского товар</option>
+          <option v-for="child in newParentItem.children" :key="child.name" :value="child">{{ child.name }}</option>
+        </select>
+
+        <select v-if="newChildItem" v-model="newGrandChildItem">
+          <option selected disabled value="">Выберите нового подподродительского товар</option>
+          <option v-for="grandChild in newChildItem.children" :key="grandChild.name" :value="grandChild">{{ grandChild.name }}</option>
+        </select>
+
         <button @click="saveEdit">Сохранить изменения</button>
-        <button @click="removeItem(editingItem)">Удалить</button> <!-- Удаление редактируемого товара -->
+        <button @click="removeItem(editingItem)">Удалить</button>
         <button @click="closeEditModal">Отмена</button>
       </div>
     </section>
@@ -122,8 +148,11 @@ export default {
       newItemQuantity: null,
       parentItem: null,
       childItem: null,
-      itemType: 'regular', // Тип добавляемого товара
-      editingItem: null, // Текущий редактируемый товар
+      editingItem: null,
+      isAddProductModalOpen: false,
+      newParentItem: null,
+      newChildItem: null,
+      newGrandChildItem: null
     };
   },
   mounted() {
@@ -134,7 +163,6 @@ export default {
       const savedItems = localStorage.getItem('items');
       return savedItems ? JSON.parse(savedItems) : this.defaultItems();
     },
-
     defaultItems() {
       return [
         {
@@ -188,61 +216,118 @@ export default {
             {
               name: "Чехлы",
               price: 10000,
-              quantity: 5
+              quantity: 5,
+              children: [
+
+              ]
             },
             {
               name: "Полики",
               price: 2000,
-              quantity: 3
+              quantity: 3,
+              children: []
+              
             }
           ]
         }
       ];
     },
-
     saveItems() {
       localStorage.setItem('items', JSON.stringify(this.items));
     },
-
     addItem() {
       if (!this.newItemName || this.newItemPrice === null || this.newItemQuantity === null) {
         alert('Пожалуйста, заполните все поля!');
         return;
       }
 
+      const newItem = {
+        name: this.newItemName,
+        price: this.newItemPrice,
+        quantity: this.newItemQuantity,
+        children: []
+      };
+
       if (this.parentItem) {
         if (this.childItem) {
-          const newItem = {
-            name: this.newItemName,
-            price: Number(this.newItemPrice),
-            quantity: Number(this.newItemQuantity)
-          };
-          this.childItem.children.push(newItem)
+          if (this.newGrandChildItem) {
+            this.newGrandChildItem.children.push(newItem);
+          } else {
+            this.childItem.children.push(newItem);
+          }
         } else {
-          const newItem = {
-            name: this.newItemName,
-            price: Number(this.newItemPrice),
-            quantity: Number(this.newItemQuantity),
-            children: []
-          };
-          this.parentItem.children.push(newItem)
+          this.parentItem.children.push(newItem);
         }
       } else {
-        const newItem = {
-          name: this.newItemName,
-          price: Number(this.newItemPrice),
-          quantity: Number(this.newItemQuantity),
-          children: []
-        };
         this.items.push(newItem);
       }
 
-      // Обновляем количество для всех родительских элементов
       this.sumItems();
-      this.resetNewItemFields();
       this.saveItems();
+      this.closeAddProductModal();
     },
+    editItem(items, item) {
+      this.editingItem = item;
+      this.newParentItem = null;
+      this.newChildItem = null;
+      this.newGrandChildItem = null;
+    },
+    saveEdit() {
+  const newItem = {
+    name: this.editingItem.name,
+    price: this.editingItem.price,
+    quantity: this.editingItem.quantity,
+    children: this.editingItem.children || [] // Сохраняем вложенных детей, если есть
+  };
+  
+  // Удаляем элемент из текущего места
+  this.removeItem(this.editingItem);
 
+  // Проверяем, куда переместить элемент
+  if (this.newGrandChildItem) {
+    this.newGrandChildItem.children.push(newItem); // Добавляем как внука
+  } else if (this.newChildItem) {
+    this.newChildItem.children.push(newItem); // Добавляем как ребенка
+  } else if (this.newParentItem) {
+    this.newParentItem.children.push(newItem); // Добавляем как дочерний элемент родителя
+  } else {
+    this.items.push(newItem); // Если нет родителя, добавляем как корневой элемент
+  }
+
+  this.sumItems(); // Пересчитываем суммы
+  this.saveItems(); // Сохраняем данные
+  this.closeEditModal(); // Закрываем модальное окно
+},
+    removeItem(item) {
+      const recursiveRemove = (items, target) => {
+    return items.filter(i => {
+      if (i === target) return false;
+      if (i.children) {
+        i.children = recursiveRemove(i.children, target);
+      }
+      return true;
+    });
+  };
+
+
+  this.items = recursiveRemove(this.items, item);
+
+  // После удаления обновляем итоги и сохраняем изменения
+  this.sumItems();
+  this.saveItems();
+},
+
+findParent(item) {
+      return this.items.find(i => i.children && i.children.includes(item));
+    },
+    calculateTotal(item) {
+      // Рекурсивно суммируем стоимость текущего элемента и всех его потомков
+      let total = item.price * item.quantity;
+      if (item.children) {
+        total += item.children.reduce((sum, child) => sum + this.calculateTotal(child), 0);
+      }
+      return total;
+    },
     sumItems() {
       this.items.forEach(item => {
         let parent_price = 0;
@@ -261,65 +346,30 @@ export default {
         };
       })
     },
-
-    resetNewItemFields() {
+    validateQuantity() {
+      if (this.editingItem.quantity < 0) {
+        alert('Количество не может быть отрицательным!');
+        this.editingItem.quantity = 0;
+      }
+    },
+    openAddProductModal() {
+      this.isAddProductModalOpen = true;
       this.newItemName = '';
       this.newItemPrice = null;
       this.newItemQuantity = null;
       this.parentItem = null;
       this.childItem = null;
-      this.itemType = 'regular'; // Сброс типа товара
     },
-
-    calculateTotal(item) {
-      return item.price * item.quantity;
+    closeAddProductModal() {
+      this.isAddProductModalOpen = false;
     },
-
-    editItem(item) {
-      this.editingItem = item;
-    },
-
-    saveEdit() {
-      this.saveItems(); // Сохраняем изменения после редактирования
-      this.sumItems(); // Пересчитываем сумму после редактирования
-      this.closeEditModal();
-    },
-
     closeEditModal() {
       this.editingItem = null;
-    },
-
-    validateQuantity() {
-      if (this.editingItem.quantity < 0) {
-        this.editingItem.quantity = 0; // Устанавливаем количество в 0, если оно отрицательное
-      }
-    },
-
-    findParent(item) {
-      return this.items.find(i => i.children && i.children.includes(item));
-    },
-
-    removeItem(item) {
-  const recursiveRemove = (items, target) => {
-    return items.filter(i => {
-      if (i === target) return false;
-      if (i.children) {
-        i.children = recursiveRemove(i.children, target);
-      }
-      return true;
-    });
-  };
-
-  this.items = recursiveRemove(this.items, item);
-
-  this.saveItems(); // Сохраняем изменения в локальном хранилище
-  this.closeEditModal(); // Закрываем модальное окно редактирования
-  this.sumItems(); // Пересчитываем сумму после удаления
-},
-
-  },
+    }
+  }
 };
 </script>
+
 
 <style scoped>
 body {
@@ -445,5 +495,33 @@ footer {
   padding: 10px;
   background-color: #333;
   color: #fff;
+}
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 5px;
+  max-width: 500px;
+  width: 100%;
+}
+
+.add-product-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.add-btn {
+  margin-top: 10px;
 }
 </style>
