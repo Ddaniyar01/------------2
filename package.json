@@ -13,6 +13,8 @@
     "flowbite-vue": "^0.1.6",
     "vue": "^3.4.29",
     "vue-router": "^4.3.3",
+    "vue-treeselect": "^1.0.7",
+    "vue3-treeselect": "^0.1.10",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
