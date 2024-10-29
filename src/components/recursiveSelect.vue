@@ -33,7 +33,6 @@ export default {
     data() {
         return {
             selected: null,
-            selectedItem: null
         };
     },
     computed: {
@@ -41,7 +40,7 @@ export default {
             return this.currentChildren && this.currentChildren.length > 0;
         },
         currentChildren() {
-            return this.items.filter(item => this.selected.name === item.name);
+            return this.selected ? this.selected.children || [] : [];
         },
         currentPath() {
             return this.selected ? [...this.parentSelection, this.selected.name] : this.parentSelection;

@@ -71,18 +71,15 @@
                 <input type="number" v-model="editingItem.quantity" @input="validateQuantity" placeholder="Количество" />
 
                 <select v-model="newParentItem">
-                    <option selected disabled value="">Выберите нового родительского товар</option>
-                    <option v-for="item in items" :key="item.name" :value="item">
-                        {{ item.name }}
-                    </option>
-                </select>
+    <option selected disabled value="">Выберите новый родительский товар</option>
+    <option v-for="item in items" :key="item.name" :value="item">{{ item.name }}</option>
+</select>
 
-                <select v-if="newParentItem" v-model="newChildItem">
-                    <option selected disabled value="">Выберите нового подродительского товар</option>
-                    <option v-for="child in newParentItem.children" :key="child.name" :value="child">
-                        {{ child.name }}
-                    </option>
-                </select>
+<select v-if="newParentItem" v-model="newChildItem">
+    <option selected disabled value="">Выберите подродительский товар</option>
+    <option v-for="child in newParentItem.children" :key="child.name" :value="child">{{ child.name }}</option>
+</select>
+
 
                 <button @click="saveEdit">Сохранить изменения</button>
                 <button @click="removeItem(editingItem)">Удалить</button>
@@ -221,79 +218,93 @@ export default {
             }
             return null;
         },
-        addItem() {
-            if (!this.newItem.name || this.newItem.price === null || this.newItem.quantity === null) {
-                alert('Пожалуйста, заполните все поля!');
-                return;
-            }
+       addItem() {
+    if (!this.newItem.name || this.newItem.price === null || this.newItem.quantity === null) {
+        alert('Пожалуйста, заполните все поля!');
+        return;
+    }
 
-            let selectedParent = null;
-            if (this.selectedItem) {
-                const result = this.findItemByName(this.items, this.selectedItem[this.selectedItem.length - 1]);
-                result.children.push({ ...this.newItem });
-            } else {
-                this.items.push({ ...this.newItem });
-            }
+    const newItem = { ...this.newItem, children: [] };
 
-            this.saveItems();
-            this.closeAddProductModal();
-        },
+    // Если выбран родитель или подродитель — добавляем туда.
+    if (this.selectedItem) {
+        const target = this.findItemByName(this.items, this.selectedItem[this.selectedItem.length - 1]);
+        target.children.push(newItem);
+    } else {
+        // Иначе добавляем в корневой массив.
+        this.items.push(newItem);
+    }
+
+    this.updatePrices(); // Обновляем стоимость.
+    this.saveItems();
+    this.closeAddProductModal();
+},
+updatePrices() {
+    const calculatePrice = (item) => {
+        if (item.children && item.children.length > 0) {
+            item.price = item.children.reduce(
+                (total, child) => total + child.price * child.quantity,
+                0
+            );
+        }
+    };
+
+    const updateItemPrices = (items) => {
+        items.forEach((item) => {
+            if (item.children) {
+                updateItemPrices(item.children); // Рекурсивно обновляем.
+            }
+            calculatePrice(item); // Пересчитываем стоимость.
+        });
+    };
+
+    updateItemPrices(this.items);
+},
+
+
         editItem(item) {
             this.editingItem = item;
             this.newParentItem = null; // Сброс нового родителя
             this.newChildItem = null;  // Сброс нового подродителя
         },
         saveEdit() {
-            // Обновляем свойства существующего элемента
-            this.editingItem.name = this.editingItem.name;
-            this.editingItem.price = this.editingItem.price;
-            this.editingItem.quantity = this.editingItem.quantity;
+    if (!this.editingItem) return;
 
-            // Если новый родитель или новый подродитель выбран
-            if (this.newParentItem || this.newChildItem) {
-                this.removeItem(this.editingItem); // Удаляем элемент из старого места
+    // Удаляем элемент из старого места, если его перемещают.
+    if (this.newChildItem || this.newParentItem) {
+        this.removeItem(this.editingItem);
+        
+        if (this.newChildItem) {
+            this.newChildItem.children.push(this.editingItem);
+        } else if (this.newParentItem) {
+            this.newParentItem.children.push(this.editingItem);
+        } else {
+            this.items.push(this.editingItem);
+        }
+    }
 
-                if (this.newChildItem) {
-                    this.newChildItem.children.push(this.editingItem); // Добавляем к новому подродителю
-                } else if (this.newParentItem) {
-                    this.newParentItem.children.push(this.editingItem); // Добавляем к новому родителю
-                } else {
-                    this.items.push(this.editingItem); // Если ничего не выбрано, добавляем в общий массив
-                }
-            }
+    this.updatePrices(); // Обновляем все цены.
+    this.saveItems();
+    this.closeEditModal();
+},
 
-            // Считаем общую стоимость для родительского элемента
-            const updateParentCost = (item) => {
-                if (item.children) {
-                    item.price = item.children.reduce((total, child) => total + (child.price * child.quantity), 0);
-                }
-            };
-
-            // Обновляем стоимость для всех родительских элементов
-            this.items.forEach(item => {
-                updateParentCost(item);
+      removeItem(item) {
+    const findAndRemove = (array, targetItem) => {
+        const index = array.findIndex((el) => el.name === targetItem.name);
+        if (index !== -1) {
+            array.splice(index, 1);
+        } else {
+            array.forEach((child) => {
+                if (child.children) findAndRemove(child.children, targetItem);
             });
+        }
+    };
 
-            this.saveItems();
-            this.editingItem = null;
-        },
-        removeItem(item) {
-            const findAndRemove = (array, itemToRemove) => {
-                const index = array.findIndex(item => item.name === itemToRemove.name);
-                if (index !== -1) {
-                    array.splice(index, 1);
-                } else {
-                    for (const child of array) {
-                        if (child.children) {
-                            findAndRemove(child.children, itemToRemove);
-                        }
-                    }
-                }
-            };
+    findAndRemove(this.items, item);
+    this.updatePrices(); // Пересчитываем цены после удаления.
+    this.saveItems();
+},
 
-            findAndRemove(this.items, item);
-            this.saveItems();
-        },
         closeEditModal() {
             this.editingItem = null;
         },
