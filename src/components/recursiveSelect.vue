@@ -5,6 +5,7 @@
                 {{ item.name }}
             </option>
         </select>
+        
         <div v-if="selected && hasChildren">
             <RecursiveSelect
                 v-for="child in currentChildren"
@@ -33,6 +34,7 @@ export default {
     data() {
         return {
             selected: null,
+            selectedItem: null
         };
     },
     computed: {
@@ -40,7 +42,7 @@ export default {
             return this.currentChildren && this.currentChildren.length > 0;
         },
         currentChildren() {
-            return this.selected ? this.selected.children || [] : [];
+            return this.items.filter(item => this.selected.name === item.name);
         },
         currentPath() {
             return this.selected ? [...this.parentSelection, this.selected.name] : this.parentSelection;
@@ -50,6 +52,7 @@ export default {
         emitSelection() {
             this.$emit('select', this.currentPath); // Отправляем событие с выбранным элементом
         },
+        
         emitSelectionFromChild(selection) {
             this.$emit('select', selection); // Emit to the parent for any child selection
         },
