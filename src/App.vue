@@ -302,7 +302,7 @@ export default {
             }
             return null;
         },
-        saveEdit() {
+       saveEdit() {
             const target = this.findItemByName(this.items, this.editingItem.name);
             if (target) {
                 target.name = this.editingItem.name;
@@ -312,10 +312,10 @@ export default {
                 // Перемещаем товар под новый родительский элемент, если выбран новый
                 if (this.newParentItem && this.newParentItem.name !== target.name) {
                     // Удаляем товар из оригинального родителя
-                    this.originalParent.children = this.originalParent.children.filter(child => child.name !== target.name);
-
+                    // this.originalParent.children = this.originalParent.children.filter(child => child.name !== target.name);
+                    this.removeItem(this.editingItem);
                     // Добавляем товар под новый родительский элемент
-                    const parentItem = this.findItemByName(this.items, this.newParentItem.name);
+                    const parentItem = this.findItemByName(this.items, this.newParentItem[this.newParentItem.length - 1]);
                     if (parentItem) {
                         parentItem.children.push(target);
                     }
