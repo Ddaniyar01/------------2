@@ -26,6 +26,9 @@
 
         <section id="products" class="products">
             <h2>Наши товары</h2>
+            <div>
+        <button @click="exportToExcel" class="export-btn">Экспортировать в Excel</button>
+      </div>
 
             <button @click="openAddProductModal" class="add-btn">
                 Добавить товар
@@ -70,7 +73,7 @@
                 <input type="number" v-model="editingItem.price" placeholder="Цена" />
                 <input type="number" v-model="editingItem.quantity" @input="validateQuantity" placeholder="Количество" />
 
-                <RecursiveSelect :items="items" @select="handleParentSelection" />
+                <RecursiveSelect :items="items" :editItem="editingItem" @select="handleParentSelection" />
                 
                 <button @click="saveEdit">Сохранить изменения</button>
                 <button @click="removeItem(editingItem)">Удалить</button>
@@ -92,6 +95,7 @@
 </template>
 
 <script>
+import * as XLSX from 'xlsx';
 import RecursiveSelect from './components/recursiveSelect.vue'
 import RecursiveTr from './components/recursiveTr.vue'
 
@@ -113,7 +117,8 @@ export default {
             },
             selectedItem: null,
             newParentItem: null,
-            originalParent: null // Хранит оригинального родителя для корректного переноса
+            originalParent: null, // Хранит оригинального родителя для корректного переноса
+            exportItems: []
         };
     },
     methods: {
@@ -331,7 +336,31 @@ export default {
             this.newParentItem = null; // сбрасываем выбранный родительский элемент
             this.selectedItem = null; // сбрасываем выбранный товар
             this.originalParent = null; // сбрасываем оригинального родителя
+        },
+        exportToExcel() {
+            this.exportItems = [];
+            this.exportArray(this.items);
+
+            const worksheet = XLSX.utils.json_to_sheet(this.exportItems);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Товары");
+
+            XLSX.writeFile(workbook, 'table_data.xlsx');
+        },
+        exportArray(items) {
+            for (const item of items) {
+                const d = {
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price
+                }
+                this.exportItems.push(d)
+                if (item.children && item.children.length > 0) {
+                    this.exportArray(item.children)
+                }
+            }
         }
+
     }
 };
 </script>

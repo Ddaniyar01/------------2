@@ -1,9 +1,17 @@
 <template>
     <div>
         <select v-if="items.length" v-model="selected" @change="emitSelection">
-            <option v-for="item in items" :key="item.name" :value="item">
-                {{ item.name }}
-            </option>
+            <template v-if="editItem">
+                <option v-for="item in items" :key="item.name" :value="item" :disabled="editItem.name == item.name">
+                    {{ item.name }}
+                </option>
+            </template>
+            <template v-else>
+                <option v-for="item in items" :key="item.name" :value="item">
+                    {{ item.name }}
+                </option>
+            </template>
+            
         </select>
         
         <div v-if="selected && hasChildren">
@@ -12,6 +20,7 @@
                 :key="child.name"
                 :items="child.children"
                 :parent-selection="currentPath"
+                :editItem="editItem"
                 @select="emitSelectionFromChild"
             />
         </div>
@@ -29,7 +38,12 @@ export default {
         parentSelection: {
             type: Array,
             default: () => []
-        }
+        },
+        editItem: {
+            type: Object,
+            required: false,
+            default: () => {}
+        },
     },
     data() {
         return {
@@ -50,6 +64,7 @@ export default {
     },
     methods: {
         emitSelection() {
+            console.log(this.editItem)
             this.$emit('select', this.currentPath); // Отправляем событие с выбранным элементом
         },
         
